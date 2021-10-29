@@ -26,6 +26,19 @@ stage('test') {
     timeout(time: 15, unit: 'MINUTES') {
         try {
             sh '''
+                export GRAMINE_MUSL=1
+                cd LibOS/shim/test/regression
+                RA_CLIENT_SPID=${ra_client_spid} gramine-test -n tests_musl.toml build -v
+                python3 -m pytest -v --junit-xml libos-regression-musl.xml
+            '''
+        } finally {
+            junit 'LibOS/shim/test/regression/libos-regression-musl.xml'
+        }
+    }
+
+    timeout(time: 15, unit: 'MINUTES') {
+        try {
+            sh '''
                 cd LibOS/shim/test/fs
                 gramine-test build -v
                 python3 -m pytest -v --junit-xml fs.xml

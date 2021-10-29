@@ -10,6 +10,7 @@ import unittest
 from graminelibos.regression import (
     HAS_SGX,
     ON_X86,
+    USES_MUSL,
     RegressionTestCase,
 )
 
@@ -60,20 +61,20 @@ class TC_01_Bootstrap(RegressionTestCase):
 
         # One Argument Given
         self.assertIn('# of arguments: 1', stdout)
-        self.assertIn('argv[0] = bootstrap', stdout)
+        self.assertIn(f'argv[0] = {"musl_" if USES_MUSL else ""}bootstrap', stdout)
 
     def test_101_basic_bootstrapping_five_arguments(self):
         # Five Arguments Given
         stdout, _ = self.run_binary(['bootstrap', 'a', 'b', 'c', 'd'])
         self.assertIn('# of arguments: 5', stdout)
-        self.assertIn('argv[0] = bootstrap', stdout)
+        self.assertIn(f'argv[0] = {"musl_" if USES_MUSL else ""}bootstrap', stdout)
         self.assertIn('argv[1] = a', stdout)
         self.assertIn('argv[2] = b', stdout)
         self.assertIn('argv[3] = c', stdout)
         self.assertIn('argv[4] = d', stdout)
 
     def test_102_argv_from_file(self):
-        args = ['bootstrap', 'THIS', 'SHOULD GO', 'TO', '\nTHE\n', 'APP']
+        args = [('musl_' if USES_MUSL else '') + 'bootstrap', 'THIS', 'SHOULD GO', 'TO', '\nTHE\n', 'APP']
         result = subprocess.run(['gramine-argv-serializer'] + args,
                                 stdout=subprocess.PIPE, check=True)
         with open('argv_test_input', 'wb') as f:
@@ -136,19 +137,20 @@ class TC_01_Bootstrap(RegressionTestCase):
 
     def test_106_basic_bootstrapping_static(self):
         stdout, _ = self.run_binary(['bootstrap_static'])
-        self.assertIn('Hello world (bootstrap_static)!', stdout)
+        self.assertIn(f'Hello world ({"musl_" if USES_MUSL else ""}bootstrap_static)!', stdout)
 
     def test_107_basic_bootstrapping_pie(self):
         stdout, _ = self.run_binary(['bootstrap_pie'])
         self.assertIn('User program started', stdout)
         self.assertIn('Local Address in Executable: 0x', stdout)
-        self.assertIn('argv[0] = bootstrap_pie', stdout)
+        self.assertIn(f'argv[0] = {"musl_" if USES_MUSL else ""}bootstrap_pie', stdout)
 
     def test_108_uid_and_gid(self):
         stdout, _ = self.run_binary(['uid_gid'])
         self.assertIn('TEST OK', stdout)
 
-    @unittest.skipUnless(ON_X86, "x86-specific")
+    @unittest.skipUnless(ON_X86, 'x86-specific')
+    @unittest.skipIf(USES_MUSL, 'c++ not supported with musl')
     def test_110_basic_bootstrapping_cpp(self):
         stdout, _ = self.run_binary(['bootstrap_cpp'])
         self.assertIn('User Program Started', stdout)
@@ -328,6 +330,7 @@ class TC_01_Bootstrap(RegressionTestCase):
 
 
 class TC_02_OpenMP(RegressionTestCase):
+    @unittest.skipIf(USES_MUSL, 'OpenMP not supported with musl')
     def test_000_simple_for_loop(self):
         stdout, _ = self.run_binary(['openmp'])
 
@@ -448,6 +451,7 @@ class TC_30_Syscall(RegressionTestCase):
         self.assertIn('[bss_cwd_buf] getcwd succeeded: /', stdout)
         self.assertIn('[mmapped_cwd_buf] getcwd succeeded: /', stdout)
 
+    @unittest.skipIf(USES_MUSL, 'musl incorrectly assumes all arguments are valid')
     def test_010_stat_invalid_args(self):
         stdout, _ = self.run_binary(['stat_invalid_args'])
 
@@ -690,6 +694,7 @@ class TC_30_Syscall(RegressionTestCase):
         self.assertIn('eventfd_using_various_flags completed successfully', stdout)
         self.assertIn('eventfd_using_fork completed successfully', stdout)
 
+    @unittest.skipIf(USES_MUSL, 'sched_setscheduler not supported in musl')
     def test_080_sched(self):
         stdout, _ = self.run_binary(['sched'])
 
@@ -783,7 +788,7 @@ class TC_40_FileSystem(RegressionTestCase):
         self.assertIn('/proc/self: link: 2', lines)
         self.assertIn('/proc/2: directory', lines)
         self.assertIn('/proc/2/cwd: link: /', lines)
-        self.assertIn('/proc/2/exe: link: /proc_common', lines)
+        self.assertIn(f'/proc/2/exe: link: /{"musl_" if USES_MUSL else ""}proc_common', lines)
         self.assertIn('/proc/2/root: link: /', lines)
         self.assertIn('/proc/2/maps: file', lines)
 
@@ -798,7 +803,7 @@ class TC_40_FileSystem(RegressionTestCase):
         self.assertIn('/proc/2/task/2: directory', lines)
         self.assertIn('/proc/2/task/33: directory', lines)
         self.assertIn('/proc/2/task/33/cwd: link: /', lines)
-        self.assertIn('/proc/2/task/33/exe: link: /proc_common', lines)
+        self.assertIn(f'/proc/2/task/33/exe: link: /{"musl_" if USES_MUSL else ""}proc_common', lines)
         self.assertIn('/proc/2/task/33/root: link: /', lines)
         self.assertIn('/proc/2/task/33/fd/0: link: /dev/tty', lines)
         self.assertIn('/proc/2/task/33/fd/1: link: /dev/tty', lines)
@@ -806,7 +811,7 @@ class TC_40_FileSystem(RegressionTestCase):
 
         # /proc/[ipc-pid]/*
         self.assertIn('/proc/1/cwd: link: /', lines)
-        self.assertIn('/proc/1/exe: link: /proc_common', lines)
+        self.assertIn(f'/proc/1/exe: link: /{"musl_" if USES_MUSL else ""}proc_common', lines)
         self.assertIn('/proc/1/root: link: /', lines)
 
     def test_001_devfs(self):
@@ -964,7 +969,8 @@ class TC_50_GDB(RegressionTestCase):
         self.assertIn(f' main ()', backtrace_1)
         self.assertIn(' _start ()', backtrace_1)
         self.assertIn('debug.c', backtrace_1)
-        self.assertNotIn('??', backtrace_1)
+        if not USES_MUSL:
+            self.assertNotIn('??', backtrace_1)
 
         backtrace_2 = self.find('backtrace 2', stdout)
         self.assertIn(' dev_write (', backtrace_2)
@@ -972,7 +978,8 @@ class TC_50_GDB(RegressionTestCase):
         self.assertIn(' main ()', backtrace_2)
         self.assertIn(' _start ()', backtrace_2)
         self.assertIn('debug.c', backtrace_2)
-        self.assertNotIn('??', backtrace_2)
+        if not USES_MUSL:
+            self.assertNotIn('??', backtrace_2)
 
         if HAS_SGX:
             backtrace_3 = self.find('backtrace 3', stdout)
@@ -982,7 +989,8 @@ class TC_50_GDB(RegressionTestCase):
             self.assertIn(' main ()', backtrace_3)
             self.assertIn(' _start ()', backtrace_3)
             self.assertIn('debug.c', backtrace_3)
-            self.assertNotIn('??', backtrace_3)
+            if not USES_MUSL:
+                self.assertNotIn('??', backtrace_3)
 
     @unittest.skipUnless(ON_X86, 'x86-specific')
     def test_010_regs_x86_64(self):
