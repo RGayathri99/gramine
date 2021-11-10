@@ -12,6 +12,7 @@
 #include <sys/types.h>
 
 #include "api.h"
+#include "asan.h"
 #include "enclave_pf.h"
 #include "enclave_tf.h"
 #include "pal.h"
@@ -387,6 +388,7 @@ static int file_delete(PAL_HANDLE handle, enum pal_delete_mode delete_mode) {
     return ret < 0 ? unix_to_pal_error(ret) : ret;
 }
 
+/* TODO: This is broken: there's no corresponding "unmap" operation. */
 static int pf_file_map(struct protected_file* pf, PAL_HANDLE handle, void** addr,
                        pal_prot_flags_t prot, uint64_t offset, uint64_t size) {
     int ret = 0;
@@ -422,6 +424,11 @@ static int pf_file_map(struct protected_file* pf, PAL_HANDLE handle, void** addr
             return -PAL_ERROR_NOMEM;
 
         *addr = allocated_enclave_pages;
+    } else {
+        /* TODO: Shouldn't we also call `get_enclave_pages` here? */
+#ifdef ASAN
+        asan_unpoison_region((uintptr_t)*addr, size);
+#endif
     }
 
     if (prot & PAL_PROT_WRITE) {

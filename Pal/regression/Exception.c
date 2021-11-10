@@ -107,6 +107,7 @@ static void red_zone_test(void) {
     pal_printf("Red zone test ok.\n");
 }
 
+__attribute_no_sanitize_address
 int main(void) {
     pal_printf("Stack in main: %p\n", get_stack());
 

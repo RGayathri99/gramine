@@ -26,6 +26,7 @@ static void handler(bool is_in_pal, PAL_NUM arg, PAL_CONTEXT* context) {
 #endif
 }
 
+__attribute_no_sanitize_address
 int main(int argc, char** argv, char** envp) {
     volatile int c;
     DkSetExceptionHandler(handler, PAL_EVENT_MEMFAULT);

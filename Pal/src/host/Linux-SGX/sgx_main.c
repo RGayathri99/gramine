@@ -569,6 +569,15 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
     sgx_profile_report_elf(enclave->libpal_uri + URI_PREFIX_FILE_LEN, (void*)pal_area->addr);
 #endif
 
+#ifdef ASAN
+    asan_poison_region(enclave->baseaddr, enclave->size, ASAN_POISON_USER);
+    for (int i = 0; i < area_num; i++) {
+        if (strcmp(areas[i].desc, "free")) {
+            asan_unpoison_region(areas[i].addr, areas[i].size);
+        }
+    }
+#endif
+
     ret = 0;
 
 out:

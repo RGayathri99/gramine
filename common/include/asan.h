@@ -116,6 +116,7 @@
 /* Magic values to mark different kinds of inaccessible memory. */
 #define ASAN_POISON_HEAP_LEFT_REDZONE     0xfa
 #define ASAN_POISON_HEAP_AFTER_FREE       0xfd
+#define ASAN_POISON_USER                  0xf7
 
 /* Poison a memory region. `addr` must be aligned to ASAN_SHADOW_ALIGN, and `size` is rounded up to
  * ASAN_SHADOW_ALIGN. */
