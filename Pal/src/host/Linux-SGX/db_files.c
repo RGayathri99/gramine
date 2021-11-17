@@ -388,7 +388,6 @@ static int file_delete(PAL_HANDLE handle, enum pal_delete_mode delete_mode) {
     return ret < 0 ? unix_to_pal_error(ret) : ret;
 }
 
-/* TODO: This is broken: there's no corresponding "unmap" operation. */
 static int pf_file_map(struct protected_file* pf, PAL_HANDLE handle, void** addr,
                        pal_prot_flags_t prot, uint64_t offset, uint64_t size) {
     int ret = 0;
