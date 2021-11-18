@@ -573,6 +573,8 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
 #ifdef ASAN
     if (free_area)
         asan_poison_region(free_area->addr, free_area->size, ASAN_POISON_USER);
+#else
+    __UNUSED(free_area);
 #endif
 
     ret = 0;
