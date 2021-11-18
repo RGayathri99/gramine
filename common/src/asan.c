@@ -89,7 +89,7 @@ static void asan_find_problem(uintptr_t addr, size_t size, uintptr_t* out_bad_ad
             bug_type = "heap-use-after-free";
             break;
         case ASAN_POISON_USER:
-            bug_type = "use-after-poison";
+            bug_type = "use-after-poison (unallocated SGX memory?)";
             break;
         default:
             bug_type = "unknown-crash";

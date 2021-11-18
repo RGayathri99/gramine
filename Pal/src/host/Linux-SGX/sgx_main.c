@@ -413,6 +413,7 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
 
     enclave_entry_addr += pal_area->addr;
 
+    struct mem_area* free_area = NULL;
     if (last_populated_addr > enclave_heap_min) {
         areas[area_num] = (struct mem_area){.desc         = "free",
                                             .skip_eextend = true,
@@ -421,7 +422,7 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
                                             .size         = last_populated_addr - enclave_heap_min,
                                             .prot         = PROT_READ | PROT_WRITE | PROT_EXEC,
                                             .type         = SGX_PAGE_REG};
-        area_num++;
+        free_area = &areas[area_num++];
     }
 
     for (int i = 0; i < area_num; i++) {
@@ -570,12 +571,8 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
 #endif
 
 #ifdef ASAN
-    asan_poison_region(enclave->baseaddr, enclave->size, ASAN_POISON_USER);
-    for (int i = 0; i < area_num; i++) {
-        if (strcmp(areas[i].desc, "free")) {
-            asan_unpoison_region(areas[i].addr, areas[i].size);
-        }
-    }
+    if (free_area)
+        asan_poison_region(free_area->addr, free_area->size, ASAN_POISON_USER);
 #endif
 
     ret = 0;
