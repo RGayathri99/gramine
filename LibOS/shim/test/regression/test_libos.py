@@ -754,7 +754,7 @@ class TC_30_Syscall(RegressionTestCase):
         self.assertIn('TEST OK', stdout)
 
     def test_103_gettimeofday(self):
-        stdout, _ = self.run_binary(['gettimeofday'])
+        stdout, _ = self.run_binary(['gettimeofday'], timeout=30)
         self.assertIn('TEST OK', stdout)
 
     def test_110_fcntl_lock(self):
