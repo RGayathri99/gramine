@@ -58,6 +58,23 @@
  *       -mllvm -asan-stack=0
  *       -mllvm -asan-globals=0
  *       -DASAN
+ *
+ * If you want to enable stack sanitization (`-mllvm -asan-stack=1`), you need to also handle
+ * unpoisoning the stack. When function return normally, they clean up after themselves, but we have
+ * cases where a function never returns (thread exit, or change of stacks). So the requirements are:
+ *
+ * - Make sure code instrumented by AddressSanitizer runs *only* on stacks controlled by Gramine. If
+ *   code needs to run on user's stack, it should be all annotated with
+ *   `__attribute_no_sanitize_address` or written in assembly.
+ *
+ * - When a thread exits, make sure that all stack memory dedicated to this thread is unpoisoned
+ *   before it's unmapped or recycled.
+ *
+ * - When a thread changes stacks, but we expect it to return to the same stack again, it should
+ *   unpoison that stack.
+ *
+ *   TODO explain more
+ *   TODO add an assertion that a stack is clean
  */
 
 #ifndef ASAN_H_
@@ -119,7 +136,17 @@
  * directly instead of calling our callbacks. */
 #define ASAN_POISON_HEAP_LEFT_REDZONE     0xfa
 #define ASAN_POISON_HEAP_AFTER_FREE       0xfd
+#define ASAN_POISON_STACK_LEFT            0xf1
+#define ASAN_POISON_STACK_MID             0xf2
+#define ASAN_POISON_STACK_RIGHT           0xf3
+#define ASAN_POISON_STACK_AFTER_RETURN    0xf5
+#define ASAN_POISON_STACK_USE_AFTER_SCOPE 0xf8
+#define ASAN_POISON_ALLOCA_LEFT           0xca
+#define ASAN_POISON_ALLOCA_RIGHT          0xcb
 #define ASAN_POISON_USER                  0xf7  /* currently used for unallocated SGX memory */
+
+/* Size of `alloca` redzone (hardcoded in LLVM: `kAllocaRzSize`); see `asan_alloca_poison` below. */
+#define ASAN_ALLOCA_REDZONE_SIZE 32
 
 /* Poison a memory region. `addr` must be aligned to ASAN_SHADOW_ALIGN, and `size` is rounded up to
  * ASAN_SHADOW_ALIGN. */
@@ -128,6 +155,10 @@ void asan_poison_region(uintptr_t addr, size_t size, uint8_t value);
 /* Unpoison a memory region. `addr` must be aligned to ASAN_SHADOW_ALIGN, but `size` is treated
  * exactly. */
 void asan_unpoison_region(uintptr_t addr, size_t size);
+
+/* Unpoison current stack. If the current stack frame is between `addr .. addr + size`, behaves the
+ * same as `asan_unpoison_region`. Otherwise, prints a warning. */
+void asan_unpoison_current_stack(uintptr_t addr, size_t size);
 
 /* Initialization callbacks. Generated in object .init sections. Graphene doesn't call these anyway,
  * so this needs to be a no-op. */
@@ -165,8 +196,28 @@ void __asan_storeN(uintptr_t p, size_t size);
 void __asan_report_load_n(uintptr_t p, size_t size);
 void __asan_report_store_n(uintptr_t p, size_t size);
 
-/* Called when entering a function marked as no-return. Used for stack sanitization. */
+/*
+ * Called when exiting a function marked as no-return. In the original AddressSanitizer, upoisons
+ * the region starting from the current stack frame, until stack top.
+ *
+ * NOTE: Our implementation is a no-op, because it's inconvenient to determine the top of the
+ * current stack in a universal fashion. Instead, we rely on Gramine to clean up the right stack.
+ */
 void __asan_handle_no_return(void);
+
+/*
+ * Poison an area around a buffer allocated with `alloca`, using ASAN_POISON_ALLOCA_{LEFT,RIGHT}:
+ *
+ * - left redzone: ASAN_ALLOCA_REDZONE_SIZE bytes before `addr`
+ * - partial right redzone: from `addr + size` to `ALIGN_UP(addr + size, ASAN_ALLOCA_REDZONE_SIZE)`
+ * - right redzone: ASAN_ALLOCA_REDZONE_SIZE bytest after partial right redzone
+ *
+ * `addr` will be aligned to ASAN_ALLOCA_REDZONE_SIZE.
+ */
+void __asan_alloca_poison(uintptr_t addr, size_t size);
+
+/* Unpoison the stack area from `top` to `bottom`. Do nothing if `top` is zero. */
+void __asan_allocas_unpoison(uintptr_t top, uintptr_t bottom);
 
 /* Callbacks for setting the shadow memory to specific values. As with load/store callbacks, LLVM
  * normally generates inline stores and calls these functions only for bigger areas. This is

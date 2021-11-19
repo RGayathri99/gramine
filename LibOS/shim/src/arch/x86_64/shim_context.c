@@ -197,7 +197,7 @@ noreturn void restore_child_context_after_clone(struct shim_context* context) {
     PAL_CONTEXT* regs = context->regs;
     context->regs = NULL;
 
-    return_from_syscall(regs);
+    return_from_syscall(regs, /*from_libos_stack=*/false);
 }
 
 struct sigframe {

@@ -140,6 +140,7 @@ static long sgx_exitless_ocall(uint64_t code, void* ms) {
     return READ_ONCE(req->result);
 }
 
+__attribute_no_sanitize_address
 noreturn void ocall_exit(int exitcode, int is_exitgroup) {
     ms_ocall_exit_t* ms;
 

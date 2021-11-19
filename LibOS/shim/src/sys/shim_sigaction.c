@@ -223,7 +223,7 @@ long shim_do_rt_sigsuspend(const __sigset_t* mask_ptr, size_t setsize) {
 
     SHIM_TCB_SET(context.syscall_nr, -1);
     SHIM_TCB_SET(context.regs, NULL);
-    return_from_syscall(context);
+    return_from_syscall(context, /*from_libos_stack=*/true);
 }
 
 long shim_do_rt_sigtimedwait(const __sigset_t* unblocked_ptr, siginfo_t* info,

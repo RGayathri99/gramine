@@ -3,6 +3,7 @@
 #include <stdalign.h>
 
 #include "api.h"
+#include "asan.h"
 #include "ecall_types.h"
 #include "pal_internal.h"
 #include "pal_linux.h"
@@ -58,6 +59,7 @@ static int verify_and_init_rpc_queue(rpc_queue_t* untrusted_rpc_queue) {
  *      Base address of enclave. Calculated dynamically in enclave_entry.S.
  *      Trusted.
  */
+__attribute_no_sanitize_address
 void handle_ecall(long ecall_index, void* ecall_args, void* exit_target, void* enclave_base_addr) {
     if (ecall_index < 0 || ecall_index >= ECALL_NR)
         return;
@@ -66,6 +68,16 @@ void handle_ecall(long ecall_index, void* ecall_args, void* exit_target, void* e
         g_enclave_base = enclave_base_addr;
         g_enclave_top  = enclave_base_addr + GET_ENCLAVE_TLS(enclave_size);
     }
+
+#ifdef ASAN
+    // TODO explain
+    uintptr_t initial_stack_addr = GET_ENCLAVE_TLS(initial_stack_addr);
+    asan_unpoison_current_stack(initial_stack_addr - ENCLAVE_STACK_SIZE, ENCLAVE_STACK_SIZE);
+
+    uintptr_t sig_stack_low = GET_ENCLAVE_TLS(sig_stack_low);
+    uintptr_t sig_stack_high = GET_ENCLAVE_TLS(sig_stack_high);
+    asan_unpoison_region(sig_stack_low, sig_stack_high - sig_stack_low);
+#endif
 
     /* disallow malicious URSP (that points into the enclave) */
     void* ursp = (void*)GET_ENCLAVE_TLS(gpr)->ursp;
