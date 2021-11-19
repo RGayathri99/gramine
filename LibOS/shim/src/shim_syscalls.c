@@ -60,5 +60,5 @@ out:
     SHIM_TCB_SET(context.syscall_nr, -1);
     SHIM_TCB_SET(context.regs, NULL);
 
-    return_from_syscall(context);
+    return_from_syscall(context, /*from_libos_stack=*/true);
 }

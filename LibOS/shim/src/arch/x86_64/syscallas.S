@@ -212,10 +212,21 @@ Lmorestack_for_gdb_bt:
 .global return_from_syscall
 .type return_from_syscall, @function
 return_from_syscall:
-    # expects one argument (in `rdi`) - pointer to PAL_CONTEXT
+    # noreturn void return_from_syscall(PAL_CONTEXT* context, bool from_libos_stack)
     .cfi_startproc
 
     mov %rdi, %rbx
+
+#ifdef ASAN
+    test %rsi, %rsi
+    jz 1f
+
+    movq %gs:(SHIM_TCB_OFF + SHIM_TCB_LIBOS_STACK_OFF), %rdi
+    subq $SHIM_THREAD_LIBOS_STACK_SIZE, %rdi
+    movq $SHIM_THREAD_LIBOS_STACK_SIZE, %rsi
+    call asan_unpoison_current_stack
+1:
+#endif
 
     movb PAL_CONTEXT_FPREGS_USED_OFF(%rbx), %al
     test %al, %al
